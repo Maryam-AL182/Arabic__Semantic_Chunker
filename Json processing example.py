@@ -404,7 +404,7 @@ if __name__ == "__main__":
         print("Running with example file: cleaned_for_maryam1.json\n")
         
         # Check if example file exists
-        example_file = r"C:\Users\admin\Desktop\ArabicChunking\input.json"
+        example_file = r"input.json"
         if Path(example_file).exists():
             process_json_file(
                 input_filepath=example_file,
