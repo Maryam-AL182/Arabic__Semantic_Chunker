@@ -758,9 +758,15 @@ class EnhancedGrammarChunker:
     
     def _add_overlap(self, chunks: List[Dict], text: str) -> List[Dict]:
         """
-        Add overlap between consecutive chunks.
+        Add morphology-aware overlap between consecutive chunks.
         
-        Takes characters from end of previous chunk and adds to start of next.
+        Uses CAMeL Tools integration to:
+        1. Detect complete grammatical structures (verb phrases, noun phrases)
+        2. Respect morphological boundaries (clitics, affixes)
+        3. Preserve discourse markers and connectors
+        4. Extract semantically coherent overlap units
+        
+        Falls back to grammar-aware overlap if CAMeL is unavailable.
         """
         if len(chunks) <= 1:
             return chunks
@@ -770,23 +776,344 @@ class EnhancedGrammarChunker:
         for i, chunk in enumerate(chunks):
             new_chunk = chunk.copy()
             
-            # Add overlap from previous chunk
+            # Add morphology-aware overlap from previous chunk
             if i > 0:
                 prev_chunk = chunks[i - 1]
-                # Get overlap text from end of previous chunk
-                prev_end_pos = max(0, prev_chunk['end'] - self.overlap_size)
-                overlap_text = text[prev_end_pos:prev_chunk['end']]
                 
-                # Prepend to current chunk
-                new_chunk['text'] = overlap_text + " " + new_chunk['text']
-                new_chunk['start'] = prev_end_pos
-                new_chunk['metadata'] = chunk.get('metadata', {}).copy()
-                new_chunk['metadata']['has_overlap'] = True
-                new_chunk['metadata']['overlap_size'] = len(overlap_text)
+                # Extract overlap using morphological analysis
+                overlap_text = self._extract_morphology_overlap(
+                    prev_chunk['text'],
+                    self.overlap_size
+                )
+                
+                if overlap_text:
+                    # Prepend to current chunk
+                    new_chunk['text'] = overlap_text + " " + new_chunk['text']
+                    new_chunk['metadata'] = chunk.get('metadata', {}).copy()
+                    new_chunk['metadata']['has_overlap'] = True
+                    new_chunk['metadata']['overlap_size'] = len(overlap_text)
+                    new_chunk['metadata']['overlap_type'] = 'morphology_aware'
             
             overlapped.append(new_chunk)
         
         return overlapped
+    
+    def _extract_morphology_overlap(self, text: str, target_size: int) -> str:
+        """
+        Extract morphologically coherent overlap from end of text.
+        
+        Strategy (with CAMeL):
+        1. Analyze morphology of last portion of text
+        2. Identify complete syntactic units (clauses, phrases)
+        3. Detect discourse markers and connectors
+        4. Extract last complete unit that fits target_size
+        
+        Strategy (without CAMeL):
+        1. Fall back to grammar-aware extraction
+        2. Use regex patterns for phrase detection
+        3. Respect sentence and phrase boundaries
+        
+        Args:
+            text: Source text to extract from
+            target_size: Target overlap size in characters
+        
+        Returns:
+            Morphologically coherent overlap text
+        """
+        if not text or target_size <= 0:
+            return ""
+        
+        # If CAMeL is available, use morphological analysis
+        if self.analyzer and self.analyzer.camel_available:
+            return self._extract_overlap_with_camel(text, target_size)
+        else:
+            return self._extract_overlap_grammar_based(text, target_size)
+    
+    def _extract_overlap_with_camel(self, text: str, target_size: int) -> str:
+        """
+        Extract overlap using CAMeL morphological analysis.
+        
+        Identifies complete syntactic structures:
+        - Complete sentences
+        - Verbal phrases (verb + complements)
+        - Nominal phrases (noun + modifiers)
+        - Prepositional phrases
+        - Relative clauses
+        
+        CRITICAL: Never returns overlap starting with conjunction
+        """
+        # Analyze the last portion that could contain overlap
+        # Look at 2x target_size to have options
+        search_window = min(len(text), target_size * 2)
+        tail_text = text[-search_window:]
+        
+        try:
+            # Get morphological analysis
+            analyzed_sentences = self.analyzer.analyze_text(tail_text)
+            
+            if not analyzed_sentences:
+                return self._extract_overlap_grammar_based(text, target_size)
+            
+            # Strategy 1: Try to get complete clauses/sentences
+            # Start from the end and work backward
+            selected_tokens = []
+            current_len = 0
+            clause_complete = False
+            
+            # Flatten all tokens
+            all_tokens = []
+            for sent_tokens in reversed(analyzed_sentences):
+                all_tokens.extend(reversed(sent_tokens))
+            
+            for token in all_tokens:
+                token_len = len(token.surface) + 1  # +1 for space
+                
+                # Check if adding this would exceed limit
+                if current_len + token_len > target_size * 1.3:
+                    # Only break at clause boundaries
+                    if clause_complete:
+                        break
+                
+                # Add token
+                selected_tokens.insert(0, token.surface)
+                current_len += token_len
+                
+                # Check if we have a complete clause
+                # Indicators: sentence-final punctuation, discourse marker, verb phrase end
+                if self._is_clause_boundary(token, selected_tokens):
+                    clause_complete = True
+                    
+                    # If we're at a good size, stop here
+                    if current_len >= target_size * 0.7:
+                        break
+            
+            if selected_tokens:
+                overlap = ' '.join(selected_tokens)
+                # Ensure reasonable length
+                if len(overlap) >= target_size * 0.4 and len(overlap) <= target_size * 1.5:
+                    # Clean leading conjunctions
+                    overlap = self._remove_leading_particles(overlap)
+                    if overlap:
+                        return overlap
+        
+        except Exception as e:
+            # If CAMeL analysis fails, fall back to grammar-based
+            pass
+        
+        # Fallback if CAMeL extraction didn't work
+        return self._extract_overlap_grammar_based(text, target_size)
+    
+    def _is_clause_boundary(self, token: 'MorphToken', context: List[str]) -> bool:
+        """
+        Check if this token marks a clause boundary.
+        
+        Indicators:
+        - Discourse markers (من ناحية، في سياق، بالعودة)
+        - Conjunctions (و، ثم، لكن) when followed by verb
+        - Complete prepositional phrases
+        - Relative clause closures
+        """
+        # Check if it's a discourse marker
+        if token.is_discourse_marker():
+            return True
+        
+        # Check for conjunction + verb pattern (new clause)
+        if token.is_conjunction() and len(context) > 2:
+            return True
+        
+        # Check for complete prepositional phrase
+        # Preposition followed by noun phrase ending
+        if len(context) >= 2:
+            # Look for pattern: PREP + NOUN + (modifiers)
+            if token.is_noun() and len(context) >= 3:
+                # Check if this closes a PP
+                return True
+        
+        return False
+    
+    def _extract_overlap_grammar_based(self, text: str, target_size: int) -> str:
+        """
+        Fallback: Grammar-aware overlap extraction without morphology.
+        
+        Uses regex patterns and heuristics to identify:
+        - Complete sentences
+        - Phrase boundaries (comma, semicolon)
+        - Discourse markers
+        - Word boundaries
+        
+        CRITICAL: Never returns overlap starting with conjunction (و، ف، ثم)
+        """
+        # Strategy 1: Try complete sentences
+        # Split on sentence terminators
+        sentences = re.split(r'[.!؟।۔]+', text)
+        sentences = [s.strip() for s in sentences if s.strip()]
+        
+        if sentences:
+            # Get last N sentences that fit
+            selected = []
+            current_len = 0
+            
+            for sent in reversed(sentences):
+                sent_len = len(sent)
+                if current_len + sent_len <= target_size * 1.2:
+                    selected.insert(0, sent)
+                    current_len += sent_len
+                else:
+                    break
+            
+            if selected:
+                overlap = ' '.join(selected)
+                if len(overlap) >= target_size * 0.5 and len(overlap) <= target_size * 1.5:
+                    # Clean leading conjunctions
+                    overlap = self._remove_leading_particles(overlap)
+                    if overlap:
+                        return overlap
+        
+        # Strategy 2: Look for discourse markers in the tail
+        search_window = min(len(text), target_size * 2)
+        tail_text = text[-search_window:]
+        
+        # Discourse marker patterns
+        discourse_patterns = [
+            r'من ناحية أخرى',
+            r'في سياق [^\s]+',
+            r'على صعيد',
+            r'من جهة',
+            r'بالإضافة إلى',
+            r'بالعودة إلى',
+            r'في المقابل'
+        ]
+        
+        for pattern in discourse_patterns:
+            matches = list(re.finditer(pattern, tail_text))
+            if matches:
+                # Get text from last discourse marker
+                last_match = matches[-1]
+                overlap_candidate = tail_text[last_match.start():]
+                
+                if len(overlap_candidate) >= target_size * 0.5 and \
+                   len(overlap_candidate) <= target_size * 1.5:
+                    return overlap_candidate
+        
+        # Strategy 3: Phrase boundaries (comma, semicolon)
+        phrases = re.split(r'[،؛]+', text)
+        
+        if len(phrases) > 1:
+            # Get last phrase
+            last_phrase = phrases[-1].strip()
+            
+            if len(last_phrase) >= target_size * 0.5 and \
+               len(last_phrase) <= target_size * 1.5:
+                # Clean leading conjunctions
+                last_phrase = self._remove_leading_particles(last_phrase)
+                if last_phrase:
+                    return last_phrase
+        
+        # Strategy 4: Word boundaries
+        # Never cut mid-word
+        tokens = text.split()
+        
+        if tokens:
+            selected = []
+            current_len = 0
+            
+            for token in reversed(tokens):
+                token_len = len(token) + 1
+                if current_len + token_len <= target_size * 1.2:
+                    selected.insert(0, token)
+                    current_len += token_len
+                else:
+                    break
+            
+            if selected:
+                overlap = ' '.join(selected)
+                # Clean leading conjunctions
+                overlap = self._remove_leading_particles(overlap)
+                if overlap:
+                    return overlap
+        
+        # Last resort: character-based at word boundary
+        if len(text) >= target_size:
+            cutoff = text[-target_size:]
+            # Find first space
+            space_idx = cutoff.find(' ')
+            if space_idx > 0:
+                overlap = cutoff[space_idx:].strip()
+                # Clean leading conjunctions
+                overlap = self._remove_leading_particles(overlap)
+                if overlap:
+                    return overlap
+            
+            overlap = cutoff.strip()
+            overlap = self._remove_leading_particles(overlap)
+            if overlap:
+                return overlap
+        
+        return text
+    
+    def _remove_leading_particles(self, text: str) -> str:
+        """
+        Remove leading Arabic conjunctions and particles.
+        
+        Prevents chunks from starting with coordinating conjunctions (حروف العطف)
+        which create grammatically incomplete structures.
+        
+        Removes:
+        - و (and)
+        - ف (then/so)
+        - ثم (then)
+        - أو/او (or)
+        - لكن (but)
+        - بل (rather)
+        - حتى (even/until when used as conjunction)
+        
+        Args:
+            text: Text to clean
+            
+        Returns:
+            Text without leading particles
+        """
+        if not text:
+            return text
+        
+        text = text.strip()
+        
+        # Leading conjunctions (حروف العطف)
+        leading_particles = [
+            'و',      # and
+            'ف',      # then/so
+            'ثم',     # then
+            'او',     # or
+            'أو',     # or (with hamza)
+            'لكن',    # but
+            'بل',     # rather
+            'حتى',    # even/until (as conjunction)
+        ]
+        
+        # Iteratively remove leading particles
+        max_iterations = 5
+        iteration = 0
+        
+        while iteration < max_iterations:
+            original_text = text
+            
+            for particle in leading_particles:
+                # Check if starts with particle + space
+                if text.startswith(particle + ' '):
+                    text = text[len(particle):].strip()
+                    break
+                # Check if text is just the particle
+                elif text == particle:
+                    text = ''
+                    break
+            
+            # Stop if no change
+            if text == original_text:
+                break
+            
+            iteration += 1
+        
+        return text.strip()
 
 
 # ==============================================================================

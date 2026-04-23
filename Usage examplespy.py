@@ -31,11 +31,7 @@ from camel_integration import EnhancedGrammarChunker
 # ==============================================================================
 
 SAMPLE_TEXT = """
-وزارت رئيسة الوزراء الإيطالية جورجا ميلوني الجزائر، وأعلنت رغبة روما في تعزيز التعاون لزيادة إمدادات الغاز وتوسيع الشراكة في قطاع الطاقة. وتلتها زيارة وزير الخارجية الإسباني خوسيه مانويل ألباريس، في ظل حديث متزايد عن إجراء محادثات لتوسيع إمدادات الغاز الطبيعي عبر خط أنابيب "ميدغاز" من الجزائر بنسبة تصل إلى 10%، تمهيدا لتحركات أوسع قد تشمل رئيس الوزراء بيدرو سانشيز، إلى جانب مساع برتغالية لتعزيز التعاون، وسط تقارير تفيد بإمكانية قيام الرئيس أنطونيو خوسيه سيغورو بزيارة الجزائر قريبا.
-
-ولم يقتصر الاهتمام بالجزائر على الفضاء الأوروبي، إذ امتد ليشمل شركاء من خارج القارة، حيث أفادت وسائل إعلام في فيتنام بأن رئيس الوزراء فام مينه تشينه أجرى اتصالا هاتفيا مع نظيره الجزائري سيفي غريب منتصف الشهر الماضي، وبحثا سبل دعم الجزائر أمن الطاقة في فيتنام، خصوصا في مجالي النفط والغاز الطبيعي.
-
-ويأتي ذلك في وقت أظهرت فيه بيانات وحدة أبحاث الطاقة استمرار ارتفاع صادرات الغاز الطبيعي المسال الجزائري، إذ صعدت في مارس/آذار 2026 بنسبة 41% على أساس شهري، لتصل إلى 938 ألف طن، مقارنة بنحو 667 ألف طن في فبراير/شباط الماضي.
+ٱللُّغَةُ ٱلْعَرَبِيَّة هي أكثر اللغات السامية تحدثًا، وإحدى أكثر اللغات انتشاراً في العالم، يتحدثها أكثر من 467 مليون نسمة.ويتوزع متحدثوها في الوطن العربي، بالإضافة إلى العديد من المناطق الأخرى المجاورة كالأحواز وتركيا وتشاد ومالي والسنغال وإرتيريا وإثيوبيا وجنوب السودان وإيران. وبذلك فهي تحتل المركز الرابع أو الخامس من حيث اللغات الأكثر انتشارًا في العالم، وهي تحتل المركز الثالث تبعًا لعدد الدول التي تعترف بها كلغة رسمية؛ إذ تعترف بها 27 دولة لغةً رسميةً، واللغة الرابعة من حيث عدد المستخدمين على الإنترنت. اللغةُ العربيةُ ذات أهمية قصوى لدى المسلمين، فهي عندَهم لغةٌ مقدسة إذ إنها لغة القرآن، وهي لغةُ الصلاة وأساسيةٌ في القيام بالعديد من العبادات والشعائرِ الإسلامية. العربيةُ هي أيضاً لغة شعائرية رئيسية لدى عدد من الكنائس المسيحية في الوطن العربي، كما كُتبَت بها كثير من أهمِّ الأعمال الدينية والفكرية اليهودية في العصور الوسطى. ارتفعتْ مكانةُ اللغةِ العربية إثْرَ انتشارِ الإسلام بين الدول إذ أصبحت لغة السياسة والعلم والأدب لقرون طويلة في الأراضي التي حكمها المسلمون. وللغة العربية تأثير مباشر وغير مباشر على كثير من اللغات الأخرى في العالم الإسلامي، كالتركية والفارسية والأمازيغية والكردية والأردية والماليزية والإندونيسية والألبانية وبعض اللغات الإفريقية الأخرى مثل الهاوسا والسواحيلية والتجرية والأمهرية والصومالية، وبعض اللغات الأوروبية وخاصةً المتوسطية كالإسبانية والبرتغالية والمالطية والصقلية؛ ودخلت الكثير من مصطلحاتها في اللغة الإنجليزية واللغات الأخرى، مثل أدميرال والتعريفة والكحول والجبر وأسماء النجوم. كما أنها تُدرَّس بشكل رسمي أو غير رسمي في الدول الإسلامية والدول الإفريقية المحاذية للوطن العربي.
 """
 
 
@@ -97,32 +93,86 @@ def example_2_grammar_aware():
 
 
 # ==============================================================================
-# Example 3: CAMeL-Enhanced Chunking (Best Quality)
+# Example 3: CAMeL-Enhanced Chunking with Grammar-Aware Overlap (Best Quality)
 # ==============================================================================
 
 def example_3_camel_enhanced():
-    """CAMeL Tools enhanced chunking (grammar-first pipeline)"""
+    """
+    CAMeL Tools enhanced chunking demonstrating the complete pipeline:
+    
+    PIPELINE STAGES:
+    1. Grammar Analysis (CAMeL morphology + discourse markers)
+    2. Semantic Similarity (embeddings for refinement)
+    3. Grammar-Aware Overlap (intelligent boundary-respecting overlap)
+    """
     print("\n" + "=" * 80)
-    print("EXAMPLE 3: CAMeL-Enhanced Chunking (Grammar-First)")
+    print("EXAMPLE 3: Complete Grammar-First Pipeline with Intelligent Overlap")
     print("=" * 80)
     
+    print("\nPipeline Stages:")
+    print("  1️⃣  Grammar Analysis → Detect morphological boundaries")
+    print("  2️⃣  Semantic Refinement → Merge similar segments")
+    print("  3️⃣  Grammar-Aware Overlap → Add linguistically coherent overlap")
+    print()
+    
+    # Initialize CAMeL-enhanced chunker
     chunker = EnhancedGrammarChunker(
-        use_camel=True,  # Use CAMeL Tools if available
+        use_camel=True,  # Use CAMeL Tools for morphological analysis
         target_chunk_size=250,
-        overlap_size=40
+        overlap_size=40  # Will create grammar-aware overlap
     )
     
+    # Chunk the text (applies full pipeline)
     chunks = chunker.chunk(SAMPLE_TEXT)
     
-    print(f"\n✓ Created {len(chunks)} chunks (CAMeL-enhanced)\n")
+    print(f"\n✓ Created {len(chunks)} chunks using complete pipeline\n")
     
     for i, chunk in enumerate(chunks, 1):
         print(f"Chunk {i}:")
-        print(f"  Boundary reason: {chunk['boundary_reason']}")
-        print(f"  Boundary score: {chunk['boundary_score']:.2f}")
+        print(f"  Boundary: {chunk['boundary_reason']}")
+        print(f"  Score: {chunk['boundary_score']:.2f}")
         print(f"  Length: {chunk['length']} chars")
+        
+        # Show overlap details
+        if chunk['metadata'].get('has_overlap'):
+            overlap_type = chunk['metadata'].get('overlap_type', 'character')
+            overlap_size = chunk['metadata'].get('overlap_size', 0)
+            print(f"  Overlap: {overlap_type} ({overlap_size} chars)")
+        else:
+            print(f"  Overlap: None (first chunk)")
+        
         print(f"  Preview: {chunk['text'][:70]}...")
         print()
+    
+    # Demonstrate overlap quality
+    print("─" * 80)
+    print("OVERLAP QUALITY DEMONSTRATION")
+    print("─" * 80)
+    
+    if len(chunks) >= 2:
+        print("\n🔍 Examining overlap between Chunk 1 and Chunk 2:\n")
+        
+        chunk1_text = chunks[0]['text']
+        chunk2_text = chunks[1]['text']
+        
+        # Extract the overlap portion
+        if chunks[1]['metadata'].get('has_overlap'):
+            overlap_size = chunks[1]['metadata'].get('overlap_size', 0)
+            overlap_text = chunk2_text[:overlap_size]
+            
+            print(f"Chunk 1 ending:")
+            print(f"  ...{chunk1_text[-100:]}\n")
+            
+            print(f"Overlap (grammar-aware, {overlap_size} chars):")
+            print(f"  {overlap_text}\n")
+            
+            print(f"Chunk 2 beginning (after overlap):")
+            print(f"  {chunk2_text[overlap_size:overlap_size+100]}...")
+            
+            print("\n✅ Notice: Overlap preserves complete linguistic units")
+            print("   (sentences, phrases, or discourse markers)")
+        
+    print("\n" + "=" * 80)
 
 
 # ==============================================================================
@@ -527,6 +577,116 @@ def example_11_json_file_processing():
         print(f"  Text: {sample_chunk['text'][:80]}...")
 
 
+# ==============================================================================
+# Example 12: Overlap Strategy Comparison
+# ==============================================================================
+
+def example_12_overlap_comparison():
+    """
+    Compare different overlap strategies:
+    1. Character-based overlap (naive)
+    2. Grammar-aware overlap (GrammarAwareSemanticChunker)
+    3. Morphology-aware overlap (EnhancedGrammarChunker with CAMeL)
+    """
+    print("\n" + "=" * 80)
+    print("EXAMPLE 12: Overlap Strategy Comparison")
+    print("=" * 80)
+    
+    test_text = """
+التعليم هو حجر الزاوية في بناء المجتمعات المتقدمة. يساهم في تطوير المهارات وتنمية القدرات الفكرية للأفراد.
+
+من ناحية أخرى، تلعب التكنولوجيا دوراً محورياً في تحسين جودة التعليم. توفر أدوات مبتكرة للتعلم عن بعد والوصول إلى الموارد التعليمية.
+
+بالإضافة إلى ذلك، يعتبر البحث العلمي ركيزة أساسية للتقدم. يسهم في حل المشكلات المعقدة وتطوير حلول مبتكرة.
+"""
+    
+    print("\n📝 Testing with sample text about education and technology\n")
+    
+    # Strategy 1: Grammar-Aware Overlap (Sentence-based)
+    print("─" * 80)
+    print("STRATEGY 1: Grammar-Aware Overlap")
+    print("─" * 80)
+    
+    chunker1 = GrammarAwareSemanticChunker(
+        target_chunk_size=150,
+        overlap_size=40
+    )
+    
+    chunks1 = chunker1.chunk(test_text, respect_grammar=True, add_overlap=True)
+    
+    print(f"\nGenerated {len(chunks1)} chunks")
+    
+    if len(chunks1) >= 2:
+        print("\n🔍 Examining overlap between chunks:\n")
+        for i in range(1, min(3, len(chunks1))):
+            prev_text = chunks1[i-1].text
+            curr_text = chunks1[i].text
+            
+            if chunks1[i].metadata.get('has_overlap'):
+                overlap_size = chunks1[i].metadata.get('overlap_size', 0)
+                overlap_text = curr_text[:overlap_size]
+                
+                print(f"Chunk {i-1} → Chunk {i}:")
+                print(f"  Previous ending: ...{prev_text[-60:]}")
+                print(f"  Overlap ({overlap_size} chars): [{overlap_text}]")
+                print(f"  Current start: {curr_text[overlap_size:overlap_size+60]}...")
+                print()
+    
+    # Strategy 2: Morphology-Aware Overlap (CAMeL-enhanced)
+    print("─" * 80)
+    print("STRATEGY 2: Morphology-Aware Overlap (CAMeL)")
+    print("─" * 80)
+    
+    chunker2 = EnhancedGrammarChunker(
+        use_camel=True,
+        target_chunk_size=150,
+        overlap_size=40
+    )
+    
+    chunks2 = chunker2.chunk(test_text)
+    
+    print(f"\nGenerated {len(chunks2)} chunks")
+    
+    if len(chunks2) >= 2:
+        print("\n🔍 Examining overlap between chunks:\n")
+        for i in range(1, min(3, len(chunks2))):
+            prev_text = chunks2[i-1]['text']
+            curr_text = chunks2[i]['text']
+            
+            if chunks2[i]['metadata'].get('has_overlap'):
+                overlap_size = chunks2[i]['metadata'].get('overlap_size', 0)
+                overlap_type = chunks2[i]['metadata'].get('overlap_type', 'unknown')
+                overlap_text = curr_text[:overlap_size]
+                
+                print(f"Chunk {i-1} → Chunk {i}:")
+                print(f"  Type: {overlap_type}")
+                print(f"  Previous ending: ...{prev_text[-60:]}")
+                print(f"  Overlap ({overlap_size} chars): [{overlap_text}]")
+                print(f"  Current start: {curr_text[overlap_size:overlap_size+60]}...")
+                print()
+    
+    # Quality Analysis
+    print("─" * 80)
+    print("QUALITY ANALYSIS")
+    print("─" * 80)
+    
+    print("\n✅ Grammar-Aware Overlap Benefits:")
+    print("  • Respects sentence boundaries")
+    print("  • Preserves complete phrases")
+    print("  • Avoids mid-word cuts")
+    
+    print("\n✅ Morphology-Aware Overlap Benefits:")
+    print("  • Detects syntactic units (verb/noun phrases)")
+    print("  • Recognizes discourse markers")
+    print("  • Respects morphological boundaries")
+    print("  • Optimal for Arabic with complex morphology")
+    
+    print("\n💡 Recommendation:")
+    print("  Use morphology-aware overlap (CAMeL) for best results")
+    print("  Falls back to grammar-aware if CAMeL unavailable")
+    
+    print("\n" + "=" * 80)
+
 
 # ==============================================================================
 # MAIN
@@ -552,6 +712,7 @@ def main():
         example_9_strategy_comparison()
         example_10_advanced_customization()
         example_11_json_file_processing()
+        example_12_overlap_comparison()  # NEW: Grammar-aware overlap demonstration
         
         print("\n" + "=" * 80)
         print("✅ All examples completed successfully!")
@@ -560,6 +721,8 @@ def main():
         print("\n💡 Key Takeaways:")
         print("  • Use respect_grammar=True for better linguistic quality")
         print("  • CAMeL-enhanced chunker provides best results")
+        print("  • Grammar-aware overlap preserves linguistic coherence")
+        print("  • Morphology-aware overlap (CAMeL) is optimal for Arabic")
         print("  • Adjust target_chunk_size based on your use case")
         print("  • Overlap improves retrieval in RAG systems")
         print("  • Monitor grammar and semantic scores for quality")

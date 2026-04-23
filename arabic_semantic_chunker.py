@@ -800,8 +800,14 @@ class GrammarAwareSemanticChunker:
     
     def _add_overlap(self, chunks: List[Chunk], full_text: str) -> List[Chunk]:
         """
-        Add overlap between consecutive chunks.
-        Takes last N characters from previous chunk.
+        Add grammar-aware overlap between consecutive chunks.
+        
+        Instead of cutting at arbitrary character positions, this method:
+        1. Finds complete grammatical units (sentences/phrases) near the boundary
+        2. Extracts the last complete unit from previous chunk
+        3. Uses it as overlap for the next chunk
+        
+        This ensures overlap contains meaningful, complete linguistic structures.
         """
         if len(chunks) <= 1:
             return chunks
@@ -821,16 +827,190 @@ class GrammarAwareSemanticChunker:
                 metadata=chunk.metadata.copy()
             )
             
-            # Add overlap from previous chunk
-            if i > 0 and len(chunks[i - 1].text) >= self.overlap_size:
-                prev_end = chunks[i - 1].text[-self.overlap_size:]
-                new_chunk.text = prev_end + " " + new_chunk.text
-                new_chunk.metadata['has_overlap'] = True
-                new_chunk.metadata['overlap_size'] = self.overlap_size
+            # Add grammar-aware overlap from previous chunk
+            if i > 0:
+                prev_chunk = chunks[i - 1]
+                overlap_text = self._extract_grammar_overlap(
+                    prev_chunk.text,
+                    self.overlap_size
+                )
+                
+                if overlap_text:
+                    new_chunk.text = overlap_text + " " + new_chunk.text
+                    new_chunk.metadata['has_overlap'] = True
+                    new_chunk.metadata['overlap_size'] = len(overlap_text)
+                    new_chunk.metadata['overlap_type'] = 'grammar_aware'
             
             overlapped.append(new_chunk)
         
         return overlapped
+    
+    def _extract_grammar_overlap(self, text: str, target_size: int) -> str:
+        """
+        Extract grammar-aware overlap from end of text.
+        
+        Strategy:
+        1. Split text into sentences
+        2. Take last N sentences that fit within target_size
+        3. If no full sentence fits, take last complete phrase
+        4. Fallback to word boundaries (never mid-word)
+        5. CRITICAL: Remove leading conjunctions/particles (و، ف، ثم، etc.)
+        
+        Args:
+            text: Source text to extract from
+            target_size: Target overlap size in characters
+        
+        Returns:
+            Grammar-aware overlap text (never starts with conjunction)
+        """
+        if not text or target_size <= 0:
+            return ""
+        
+        # Strategy 1: Try to get complete sentences
+        sentences = self.normalizer.segment_sentences(text)
+        
+        if len(sentences) > 0:
+            # Get sentences from end that fit in target_size
+            selected = []
+            current_len = 0
+            
+            for sent in reversed(sentences):
+                sent_len = len(sent)
+                if current_len + sent_len <= target_size * 1.2:  # 20% tolerance
+                    selected.insert(0, sent)
+                    current_len += sent_len
+                else:
+                    break
+            
+            if selected:
+                overlap = ' '.join(selected)
+                # Ensure it's not too long
+                if len(overlap) <= target_size * 1.5:
+                    # Clean leading conjunctions
+                    overlap = self._remove_leading_particles(overlap)
+                    if overlap:
+                        return overlap
+        
+        # Strategy 2: Try to get complete phrases (comma/semicolon delimited)
+        # Split on Arabic comma (،) and semicolon (؛)
+        phrases = re.split(r'[،؛]+', text)
+        
+        if len(phrases) > 1:
+            # Get last phrase
+            last_phrase = phrases[-1].strip()
+            
+            # If it fits, use it
+            if len(last_phrase) >= target_size * 0.5 and len(last_phrase) <= target_size * 1.5:
+                # Clean leading conjunctions
+                last_phrase = self._remove_leading_particles(last_phrase)
+                if last_phrase:
+                    return last_phrase
+        
+        # Strategy 3: Fallback to word boundaries
+        # Never cut in the middle of a word
+        tokens = self.normalizer.tokenize(text)
+        
+        if tokens:
+            selected_tokens = []
+            current_len = 0
+            
+            for token in reversed(tokens):
+                token_len = len(token)
+                if current_len + token_len <= target_size * 1.2:
+                    selected_tokens.insert(0, token)
+                    current_len += token_len
+                else:
+                    break
+            
+            if selected_tokens:
+                overlap = ' '.join(selected_tokens)
+                # Clean leading conjunctions
+                overlap = self._remove_leading_particles(overlap)
+                if overlap:
+                    return overlap
+        
+        # Last resort: character-based but at word boundary
+        if len(text) >= target_size:
+            cutoff = text[-target_size:]
+            # Find first space to avoid mid-word cut
+            space_idx = cutoff.find(' ')
+            if space_idx > 0:
+                overlap = cutoff[space_idx:].strip()
+                # Clean leading conjunctions
+                overlap = self._remove_leading_particles(overlap)
+                if overlap:
+                    return overlap
+            
+            overlap = cutoff.strip()
+            overlap = self._remove_leading_particles(overlap)
+            if overlap:
+                return overlap
+        
+        return text
+    
+    def _remove_leading_particles(self, text: str) -> str:
+        """
+        Remove leading Arabic conjunctions and particles.
+        
+        Arabic chunks should NEVER start with:
+        - و (and) - coordinating conjunction
+        - ف (then/so) - coordinating conjunction  
+        - ثم (then) - coordinating conjunction
+        - أو (or) - coordinating conjunction
+        - لكن (but) - coordinating conjunction
+        - بل (rather) - coordinating conjunction
+        
+        These create grammatically incomplete structures.
+        
+        Args:
+            text: Text to clean
+            
+        Returns:
+            Text without leading particles
+        """
+        if not text:
+            return text
+        
+        text = text.strip()
+        
+        # Leading conjunctions that make chunks incomplete
+        # These are حروف العطف (coordinating conjunctions)
+        leading_particles = [
+            'و',      # and
+            'ف',      # then/so
+            'ثم',     # then
+            'او',     # or
+            'أو',     # or (with hamza)
+            'لكن',    # but
+            'بل',     # rather
+            'حتى',    # even/until (when used as conjunction)
+        ]
+        
+        # Keep removing leading particles until none remain
+        max_iterations = 5  # Prevent infinite loop
+        iteration = 0
+        
+        while iteration < max_iterations:
+            original_text = text
+            
+            # Check each particle
+            for particle in leading_particles:
+                # Pattern: particle at start, followed by space
+                if text.startswith(particle + ' '):
+                    text = text[len(particle):].strip()
+                    break
+                # Pattern: standalone particle (entire text is just the particle)
+                elif text == particle:
+                    text = ''
+                    break
+            
+            # If nothing changed, we're done
+            if text == original_text:
+                break
+            
+            iteration += 1
+        
+        return text.strip()
     
     def chunk_to_dict(self, chunks: List[Chunk]) -> List[Dict]:
         """Convert chunks to dictionary format for JSON export"""
